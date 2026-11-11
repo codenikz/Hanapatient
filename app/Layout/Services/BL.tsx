@@ -1,0 +1,99 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { auth } from '../../../Firebase/FirebaseConfig';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+
+export default function BL() {
+  const router = useRouter();
+  const { language } = useLocalSearchParams();
+  const isTagalog = language === 'filipino';
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (user) {
+      setUserEmail(user.email);
+    }
+  }, []);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header Row */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#4A148C" />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.topApplyButton} 
+          onPress={() => router.push({ pathname: '/Layout/Apply/BLA', params: { language } })}
+        >
+          <Text style={styles.topApplyText}>{isTagalog ? 'Mag-apply' : 'Apply'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.headerBox}>
+          {/* Inalis ang 'qz' na nagdudulot ng error */}
+          <View style={styles.imageCircle}>
+            <Image source={require('../../../Image/bleaching.png')} style={styles.headerImage} />
+          </View>
+          <Text style={styles.title}>Teeth Bleaching</Text>
+          <Text style={styles.subTitle}>(Pagpapaputi ng ngipin)</Text>
+          
+          <View style={styles.userContainer}>
+            <Text style={styles.userLabel}>{isTagalog ? 'Naka-log in bilang:' : 'Logged in as:'}</Text>
+            <Text style={styles.userEmail}>{userEmail || (isTagalog ? 'Walang naka-log in na user' : 'No user logged in')}</Text>
+          </View>
+        </View>
+
+        {/* Bleaching Image Section */}
+        <View style={styles.singleImageContainer}>
+          <Image source={require('../../../assets/Teeth/Bulok.png')} style={styles.singleImage} resizeMode="contain" />
+        </View>
+
+        {/* Indication */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>{isTagalog ? 'Indikasyon (Indication):' : 'Indication:'}</Text>
+          <Text style={styles.text}>
+            {isTagalog 
+              ? 'Ang bleaching ay para sa mga pasyenteng nais pagandahin ang kulay ng kanilang ngipin sa pamamagitan ng pagbawas ng mga mantsa at pagdidilaw. Karaniwan itong inirerekomenda para sa mga ngiping namilaw dahil sa katandaan, mantsa sa pagkain at inumin, paninigarilyo, o ilang mga gamot. Maaari din itong gamitin upang mapaganda ang hitsura ng malusog na ngiti at mapabuti ang estetika ng ngipin.'
+              : 'Bleaching is indicated for patients who want to improve the color of their teeth by reducing stains and discoloration. It is commonly recommended for teeth that have become yellowed due to aging, food and beverage stains, smoking, or certain medications. Bleaching may also be used to enhance the appearance of a healthy smile and improve dental esthetics.'}
+          </Text>
+        </View>
+        
+        {/* Contraindication */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>{isTagalog ? 'Kontraindikasyon (Contraindication):' : 'Contraindication:'}</Text>
+          <Text style={styles.text}>
+            {isTagalog 
+              ? 'Ang bleaching ay hindi ipinapayo sa mga pasyenteng may hindi pa nagamot na sira sa ngipin, sakit sa gilagid, o sensitibong ngipin, dahil maaaring lumala ang mga kondisyong ito. Hindi rin ito inirerekomenda sa mga indibidwal na may malalaking restorasyon o pasta sa nakikitang ngipin, mga buntis o nagpapasusong ina, o mga pasyenteng hindi makatotohanan ang inaasahan sa resulta ng paggamot.'
+              : 'Bleaching is contraindicated in patients with untreated cavities, gum disease, or tooth sensitivity, as the procedure may worsen these conditions. It is also not recommended for individuals with extensive dental restorations on visible teeth, pregnant or breastfeeding women, or patients who have unrealistic expectations about the results of treatment.'}
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8F4FF' },
+  topHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: 50 },
+  backButton: { padding: 5 },
+  topApplyButton: { backgroundColor: '#4A148C', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
+  topApplyText: { color: '#FFF', fontWeight: 'bold' },
+  scrollContent: { padding: 20, paddingTop: 0 },
+  headerBox: { alignItems: 'center', marginBottom: 20 },
+  imageCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#E1BEE7', justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderWidth: 3, borderColor: '#4A148C' },
+  headerImage: { width: 80, height: 80 },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#4A148C', textAlign: 'center' },
+  subTitle: { fontSize: 16, color: '#4A148C', marginBottom: 10 },
+  userContainer: { width: '100%', padding: 15, backgroundColor: '#FFF', borderRadius: 15, alignItems: 'center', borderWidth: 1, borderColor: '#E1BEE7' },
+  userLabel: { fontSize: 12, color: '#4A148C', fontWeight: '600' },
+  userEmail: { fontSize: 16, fontWeight: 'bold', color: '#000' },
+  singleImageContainer: { marginBottom: 15, alignItems: 'center' },
+  singleImage: { width: '100%', height: 150 },
+  card: { backgroundColor: '#FFF', padding: 20, borderRadius: 20, marginBottom: 15, elevation: 3 },
+  sectionHeader: { fontSize: 20, fontWeight: 'bold', color: '#4A148C', marginBottom: 10 },
+  text: { fontSize: 14, color: '#000', marginBottom: 8, lineHeight: 20 }
+});

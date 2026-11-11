@@ -1,0 +1,312 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, FlatList, SafeAreaView, Modal, TextInput, Alert, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
+import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth, db, storage } from '../../Firebase/FirebaseConfig'; 
+import { ref as dbRef, push, set } from 'firebase/database';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { signOut } from 'firebase/auth';
+
+const services = [
+  { id: '1', title: 'Tooth Extraction', sub: 'Bunot', icon: require('../../Image/extraction.png'), path: '/Layout/Services/TE' },
+  { id: '2', title: 'Tooth Restoration', sub: 'Pasta', icon: require('../../Image/restoration.png'), path: '/Layout/Services/TR' },
+  { id: '3', title: 'Oral Prophylaxis', sub: 'Linis', icon: require('../../Image/prophylaxis.png'), path: '/Layout/Services/OP' },
+  { id: '4', title: 'Complete Denture', sub: 'Pustiso', icon: require('../../Image/complete_denture.png'), path: '/Layout/Services/CD' },
+  { id: '5', title: 'Fixed Partial Denture', sub: 'Fixed Pustiso', icon: require('../../Image/fixed_denture.png'), path: '/Layout/Services/FPD' },
+  { id: '6', title: 'Removable Partial Denture', sub: 'Removable', icon: require('../../Image/removable.png'), path: '/Layout/Services/RPD' },
+  { id: '7', title: 'Bleaching', sub: 'Pagpaputi', icon: require('../../Image/bleaching.png'), path: '/Layout/Services/BL' },
+  { id: '8', title: 'Fluoride', sub: 'Proteksyon', icon: require('../../Image/fluoride.png'), path: '/Layout/Services/FA' },
+  { id: '9', title: 'Sealant', sub: 'Sealant', icon: require('../../Image/sealant.png'), path: '/Layout/Services/SA' },
+];
+
+export default function Dashboard() {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [concernText, setConcernText] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [language, setLanguage] = useState<'english' | 'filipino'>('english');
+
+  useEffect(() => {
+    if (auth.currentUser) setUserEmail(auth.currentUser.email || '');
+    loadSavedLanguage();
+  }, []);
+
+  const loadSavedLanguage = async () => {
+    try {
+      const savedLang = await AsyncStorage.getItem('app_language');
+      if (savedLang === 'english' || savedLang === 'filipino') {
+        setLanguage(savedLang);
+      }
+    } catch (error) {
+      console.log('Error loading language', error);
+    }
+  };
+
+  const changeLanguage = async (lang: 'english' | 'filipino') => {
+    setLanguage(lang);
+    try {
+      await AsyncStorage.setItem('app_language', lang);
+    } catch (error) {
+      console.log('Error saving language', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setLogoutModalVisible(false);
+      router.replace('/');
+    } catch (error: any) {
+      Alert.alert("Logout Error", error.message);
+    }
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+    });
+    if (!result.canceled) setImages(prev => [...prev, ...result.assets.map(a => a.uri)]);
+  };
+
+  const removeImage = (uriToRemove: string) => {
+    setImages(prev => prev.filter(uri => uri !== uriToRemove));
+  };
+
+  const submitConcern = async () => {
+    if (!concernText) return Alert.alert(language === 'english' ? "Oops!" : "Uy!", language === 'english' ? "Please write your concern." : "Mangyaring isulat ang iyong alalahanin.");
+    setLoading(true);
+    try {
+      const imageUrls = await Promise.all(images.map(async (uri) => {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const filename = `concerns/${Date.now()}_${Math.random()}.jpg`;
+        const sRef = storageRef(storage, filename);
+        await uploadBytes(sRef, blob);
+        return await getDownloadURL(sRef);
+      }));
+      const newConcernRef = push(dbRef(db, 'concerns'));
+      await set(newConcernRef, { email: userEmail, concern: concernText, images: imageUrls, date: new Date().toISOString() });
+      
+      setModalVisible(false);
+      setConcernText('');
+      setImages([]);
+      setSuccessModalVisible(true);
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      <View style={styles.header}>
+        <View style={styles.actionBox}>
+          <TouchableOpacity onPress={() => router.push('/Layout/Account')} style={styles.iconCircle}>
+            <Ionicons name="person" size={22} color="#4A148C" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setLogoutModalVisible(true)} style={styles.iconCircle}>
+            <Ionicons name="log-out" size={22} color="#D32F2F" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tabButton, language === 'english' && styles.activeTab]} 
+            onPress={() => changeLanguage('english')}
+          >
+            <Text style={[styles.tabText, language === 'english' && styles.activeTabText]}>English</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabButton, language === 'filipino' && styles.activeTab]} 
+            onPress={() => changeLanguage('filipino')}
+          >
+            <Text style={[styles.tabText, language === 'filipino' && styles.activeTabText]}>Filipino</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.logoCircle}>
+          <Image source={require('../../Image/Logo.png')} style={styles.logo} />
+        </View>
+        <Text style={styles.headerTitle}>
+          {language === 'english' ? 'Dental Services' : 'Mga Serbisyo sa Ngipin'}
+        </Text>
+
+        <TouchableOpacity style={styles.appliedBtn} onPress={() => router.push({ pathname: '/Layout/ServiceApply', params: { language } })}>
+          <Ionicons name="document-text" size={18} color="#4A148C" />
+          <Text style={styles.appliedBtnText}>
+            {language === 'english' ? ' Applied Services' : ' Mga Inaplayang Serbisyo'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={services}
+        numColumns={3}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.grid}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={styles.card} 
+            onPress={() => router.push({ pathname: item.path as any, params: { language } })}
+          >
+            <Image source={item.icon} style={styles.icon} />
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardSub}>{item.sub}</Text>
+          </TouchableOpacity>
+        )}
+      />
+
+      <TouchableOpacity style={styles.otherButton} onPress={() => setModalVisible(true)}>
+        <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFF" />
+        <Text style={styles.otherButtonText}>
+          {language === 'english' ? ' Other Concern' : ' Iba Pang Alalahanin'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* SUCCESS MODAL */}
+      <Modal animationType="fade" transparent={true} visible={successModalVisible}>
+        <View style={styles.centeredModal}>
+          <View style={styles.successBox}>
+            <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+            <Text style={styles.successTitle}>
+              {language === 'english' ? 'Submitted!' : 'Naipasa na!'}
+            </Text>
+            <Text style={styles.successSub}>
+              {language === 'english' ? 'Your concern has been sent to our team.' : 'Naipadala na ang iyong alalahanin sa aming koponan.'}
+            </Text>
+            <TouchableOpacity style={styles.doneBtn} onPress={() => setSuccessModalVisible(false)}>
+              <Text style={styles.doneBtnText}>
+                {language === 'english' ? 'Done' : 'Tapos na'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* LOGOUT MODAL */}
+      <Modal animationType="fade" transparent={true} visible={logoutModalVisible}>
+        <View style={styles.centeredModal}>
+          <View style={styles.logoutBox}>
+            <Text style={styles.logoutTitle}>
+              {language === 'english' ? 'Logout' : 'Mag-log out'}
+            </Text>
+            <Text style={styles.logoutText}>
+              {language === 'english' ? 'Are you sure you want to exit?' : 'Sigurado ka bang gusto mong lumabas?'}
+            </Text>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={() => setLogoutModalVisible(false)}>
+                <Text style={{fontWeight: 'bold', color: '#555'}}>
+                  {language === 'english' ? 'Cancel' : 'Kanselahin'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: '#4A148C' }]} onPress={handleLogout}>
+                <Text style={{color: '#FFF', fontWeight: 'bold'}}>
+                  {language === 'english' ? 'Logout' : 'Mag-log out'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* CONCERN MODAL */}
+      <Modal animationType="slide" transparent={true} visible={modalVisible}>
+        <View style={styles.modalView}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {language === 'english' ? 'Other Concern' : 'Iba Pang Alalahanin'}
+            </Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder={language === 'english' ? 'Detail your concern...' : 'I-detalye ang iyong alalahanin...'} 
+              multiline 
+              value={concernText} 
+              onChangeText={setConcernText} 
+            />
+            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+              <Ionicons name="camera" size={20} color="#FFF" />
+              <Text style={styles.uploadButtonText}>
+                {language === 'english' ? ' Attach Photos' : ' Maglakip ng mga Larawan'}
+              </Text>
+            </TouchableOpacity>
+            <ScrollView horizontal style={styles.imageScroll}>
+              {images.map((uri, i) => (
+                <TouchableOpacity key={i} onPress={() => removeImage(uri)}>
+                  <Image source={{ uri }} style={styles.thumbnail} />
+                  <View style={styles.removeBadge}><Ionicons name="close" size={20} color="#FFF"/></View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={() => setModalVisible(false)}>
+                <Text style={{fontWeight: 'bold', color: '#555'}}>
+                  {language === 'english' ? 'Cancel' : 'Kanselahin'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: '#4A148C' }]} onPress={submitConcern}>
+                {loading ? <ActivityIndicator color="#FFF" /> : <Text style={{color: '#FFF', fontWeight: 'bold'}}>
+                  {language === 'english' ? 'Submit' : 'Ipasa'}
+                </Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8F9FE' },
+  header: { paddingHorizontal: 25, paddingTop: 30, paddingBottom: 30, backgroundColor: '#E1BEE7', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, alignItems: 'center' },
+  actionBox: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 10 },
+  iconCircle: { width: 45, height: 45, borderRadius: 25, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center' },
+  logoCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  logo: { width: 60, height: 60 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF', marginBottom: 10 },
+  appliedBtn: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, alignItems: 'center' },
+  appliedBtnText: { color: '#4A148C', fontWeight: 'bold', marginLeft: 5 },
+  tabContainer: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 20, padding: 4, marginBottom: 15, width: '70%', alignSelf: 'center' },
+  tabButton: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 16 },
+  activeTab: { backgroundColor: '#7B1FA2' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#7B1FA2' },
+  activeTabText: { color: '#FFF' },
+  grid: { padding: 10 },
+  card: { width: '30%', backgroundColor: '#FFF', margin: 5, borderRadius: 15, alignItems: 'center', padding: 10, elevation: 3 },
+  icon: { width: 40, height: 40, marginBottom: 5 },
+  cardTitle: { fontSize: 10, fontWeight: 'bold', textAlign: 'center', color: '#000000' },
+  cardSub: { fontSize: 8, textAlign: 'center', color: '#888', marginTop: 2 },
+  otherButton: { flexDirection: 'row', backgroundColor: '#E1BEE7', padding: 18, margin: 20, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
+  otherButtonText: { fontSize: 16, fontWeight: 'bold', color: '#FFF' },
+  centeredModal: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  successBox: { width: '85%', backgroundColor: '#FFF', padding: 30, borderRadius: 30, alignItems: 'center', elevation: 5 },
+  successTitle: { fontSize: 24, fontWeight: 'bold', color: '#4A148C', marginTop: 15 },
+  successSub: { color: '#666', textAlign: 'center', marginVertical: 10 },
+  doneBtn: { backgroundColor: '#4A148C', paddingVertical: 12, paddingHorizontal: 40, borderRadius: 15, marginTop: 15 },
+  doneBtnText: { color: '#FFF', fontWeight: 'bold' },
+  logoutBox: { width: '85%', backgroundColor: '#FFF', padding: 30, borderRadius: 30, alignItems: 'center' },
+  logoutTitle: { fontSize: 22, fontWeight: 'bold', color: '#4A148C' },
+  logoutText: { marginVertical: 15 },
+  modalView: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 30, height: '75%' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#4A148C', marginBottom: 15 },
+  input: { borderWidth: 1, borderColor: '#E1BEE7', borderRadius: 15, padding: 15, height: 100, textAlignVertical: 'top' },
+  uploadButton: { flexDirection: 'row', backgroundColor: '#E1BEE7', padding: 15, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginVertical: 15 },
+  uploadButtonText: { color: '#ffffff', fontWeight: 'bold', marginLeft: 8 },
+  thumbnail: { width: 70, height: 70, borderRadius: 15, marginRight: 10 },
+  removeBadge: { position: 'absolute', right: 10, top: 0, backgroundColor: 'red', borderRadius: 10, width: 20, height: 20, alignItems: 'center' },
+  imageScroll: { marginBottom: 20 },
+  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
+  btn: { padding: 15, borderRadius: 15, width: '48%', alignItems: 'center' },
+  cancelBtn: { backgroundColor: '#F0F0F0' }
+});
