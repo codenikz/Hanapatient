@@ -2,13 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ref, get, set, remove } from 'firebase/database';
-import { db } from '../../../../Firebase/FirebaseConfig';
+import { db } from '../../Firebase/FirebaseConfig';
 
-export default function Sealant({ item, onClose }: { item: any, onClose: () => void }) {
+const levelImages: { [key: string]: any } = {
+  'Slight': require('../../assets/Teeth/Slight.png'),
+  'Moderate': require('../../assets/Teeth/Moderate.png'),
+  'Severe': require('../../assets/Teeth/Severe.png'),
+};
+
+export default function OralProphylaxis({ item, onClose }: { item: any, onClose: () => void }) {
+  if (!item) return null;
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
-  // Function para ilipat ang data sa kaukulang folder sa Firebase kasama ang optional rejection reason
+  // Function para ilipat ang data sa Approved o Rejected node kasama ang optional reason
   const moveDataToStatus = async (status: 'Approved' | 'Rejected', reason: string = '') => {
     try {
       // 1. Reference sa kasalukuyang record sa "Tooth concern"
@@ -18,89 +25,40 @@ export default function Sealant({ item, onClose }: { item: any, onClose: () => v
 
       // Kunin ang data mula sa Firebase
       const snapshot = await get(oldRef);
-      
       if (snapshot.exists()) {
         const data = snapshot.val();
         
-        // I-save sa bagong location na may kasamang status, timestamp, at rejection reason kung Rejected
+        // Payload na isasave sa database
         const updatedData = {
           ...data,
           status: status,
           processedAt: new Date().toISOString(),
-          ...(status === 'Rejected' && { rejectionReason: reason })
+          ...(status === 'Rejected' && { rejectionReason: reason }) // Isasama ang reason kung Rejected
         };
 
+        // I-save sa bagong location
         await set(newRef, updatedData);
         
         // Burahin ang data sa lumang location (Tooth concern)
         await remove(oldRef);
         
-        Alert.alert("Success", `Sealant concern has been ${status}.`);
+        Alert.alert("Success", `Prophylaxis request has been moved to ${status}.`);
         setRejectModalVisible(false);
         onClose();
       } else {
-        Alert.alert("Error", "Record not found in database.");
+        Alert.alert("Error", "Record not found.");
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to process request.");
+      Alert.alert("Error", "Failed to move data.");
     }
-  };
-
-  const renderQuadrantTeeth = (quadrantKey: string, quadrantLabel: string) => {
-    const rawValue = item.selectedTeeth?.[quadrantKey];
-    
-    // Suportahan kung array (multi-select) o kung string man o iba pang format
-    let teethList: string[] = [];
-    if (Array.isArray(rawValue)) {
-      teethList = rawValue;
-    } else if (typeof rawValue === 'string' && rawValue.trim() !== '') {
-      teethList = [rawValue];
-    }
-
-    if (teethList.length === 0) return null;
-
-    return (
-      <View style={styles.quadrantBox} key={quadrantKey}>
-        <View style={styles.quadrantHeaderRow}>
-          <Ionicons name="medical" size={16} color="#E91E63" style={{ marginRight: 6 }} />
-          <Text style={styles.quadrantTitle}>{quadrantLabel}</Text>
-        </View>
-        <View style={styles.teethListContainer}>
-          {teethList.map((tooth: string, index: number) => (
-            <View key={index} style={styles.toothChip}>
-              <Text style={styles.toothChipText}>{tooth}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
-  const renderTeethInfo = () => {
-    if (!item.selectedTeeth) return <Text style={styles.value}>Not specified</Text>;
-
-    const quadrants = [
-      { key: 'upperRight', label: 'Upper Right' },
-      { key: 'upperLeft', label: 'Upper Left' },
-      { key: 'lowerRight', label: 'Lower Right' },
-      { key: 'lowerLeft', label: 'Lower Left' },
-    ];
-
-    const content = quadrants.map(q => renderQuadrantTeeth(q.key, q.label)).filter(Boolean);
-
-    if (content.length > 0) {
-      return content;
-    }
-
-    return <Text style={styles.value}>No specific teeth selected.</Text>;
   };
 
   return (
     <View style={styles.overlay}>
       <View style={styles.modalContent}>
         <View style={styles.headerBar}>
-          <Text style={styles.title}>Sealant Details</Text>
+          <Text style={styles.title}>Prophylaxis Details</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color="#666" />
           </TouchableOpacity>
@@ -109,26 +67,31 @@ export default function Sealant({ item, onClose }: { item: any, onClose: () => v
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.infoCard}>
             <Text style={styles.label}>Patient Name</Text>
-            <Text style={styles.value}>{item?.patientName || 'Unknown'}</Text>
+            <Text style={styles.value}>{item?.patientName}</Text>
             
             <Text style={[styles.label, { marginTop: 15 }]}>Date Submitted</Text>
-            <Text style={styles.value}>
-              {item?.timestamp ? new Date(item.timestamp).toLocaleDateString('en-PH', { dateStyle: 'long' }) : 'N/A'}
-            </Text>
+            <Text style={styles.value}>{item?.timestamp ? new Date(item.timestamp).toLocaleDateString('en-PH', { dateStyle: 'long' }) : 'N/A'}</Text>
           </View>
 
-          <Text style={styles.sectionHeader}>Selected Teeth</Text>
-          <View style={styles.messageBox}>
-            {renderTeethInfo()}
+          <Text style={styles.sectionHeader}>Tartar/Stain Level</Text>
+          <View style={styles.landscapeBox}>
+            <Image 
+              source={levelImages[item?.selectedLevel]} 
+              style={styles.landscapeImage} 
+            />
+            <View style={styles.landscapeInfo}>
+              <Text style={styles.label}>Severity Level</Text>
+              <Text style={styles.classText}>{item?.selectedLevel || "Not specified"}</Text>
+            </View>
           </View>
 
-          {item.imageUris && item.imageUris.length > 0 && (
+          {item?.imageUris && item.imageUris.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>Teeth Pictures</Text>
+              <Text style={styles.sectionHeader}>Patient's Photos</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
                 {item.imageUris.map((uri: string, index: number) => (
                   <View key={index} style={styles.imageWrapper}>
-                    <Image source={{ uri }} style={styles.image} />
+                    <Image source={{ uri }} style={styles.patientImage} />
                   </View>
                 ))}
               </ScrollView>
@@ -206,18 +169,15 @@ const styles = StyleSheet.create({
   closeBtn: { backgroundColor: '#F0F0F0', padding: 8, borderRadius: 20 },
   infoCard: { backgroundColor: '#F8F4FF', padding: 15, borderRadius: 15, marginBottom: 20 },
   label: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
-  value: { fontSize: 15, fontWeight: '700', color: '#333' },
+  value: { fontSize: 15, fontWeight: '700', color: '#333', marginTop: 2 },
   sectionHeader: { fontSize: 14, fontWeight: '700', color: '#E91E63', marginBottom: 10 },
-  messageBox: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EEE', padding: 15, borderRadius: 15, marginBottom: 20, gap: 12 },
-  quadrantBox: { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EFEFEF', padding: 12, borderRadius: 12 },
-  quadrantHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  quadrantTitle: { fontSize: 13, fontWeight: '700', color: '#E91E63' },
-  teethListContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  toothChip: { backgroundColor: '#FCE4EC', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#F8BBD0' },
-  toothChipText: { fontSize: 12, fontWeight: '600', color: '#AD1457' },
+  landscapeBox: { flexDirection: 'row', backgroundColor: '#FFF', borderWidth: 2, borderColor: '#E91E63', padding: 10, borderRadius: 20, marginBottom: 20, alignItems: 'center' },
+  landscapeImage: { width: 140, height: 90, borderRadius: 12, resizeMode: 'cover' },
+  landscapeInfo: { flex: 1, marginLeft: 15 },
+  classText: { fontSize: 18, fontWeight: '900', color: '#E91E63' },
   imageScroll: { marginBottom: 20 },
   imageWrapper: { marginRight: 15 },
-  image: { width: 120, height: 120, borderRadius: 15, borderWidth: 2, borderColor: '#E91E63' },
+  patientImage: { width: 120, height: 120, borderRadius: 15, borderWidth: 2, borderColor: '#E91E63' },
   actionButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
   btn: { flexDirection: 'row', padding: 16, borderRadius: 15, width: '47%', alignItems: 'center', justifyContent: 'center' },
   rejectBtn: { backgroundColor: '#E91E63' },

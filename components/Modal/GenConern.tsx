@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ref, get, set, remove } from 'firebase/database';
-import { db } from '../../../../Firebase/FirebaseConfig';
+import { db } from '../../Firebase/FirebaseConfig';
 
-export default function Extraction({ item, onClose }: { item: any, onClose: () => void }) {
+export default function GenConern({ item, onClose }: { item: any, onClose: () => void }) {
+  if (!item) return null;
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // Function para ilipat ang data na may kasamang reason kung rejected
   const moveDataToStatus = async (status: 'Approved' | 'Rejected', reason: string = '') => {
     try {
-      // 1. Reference sa kasalukuyang data
-      const oldRef = ref(db, `Tooth concern/${item.id}`);
-      // 2. Reference sa bagong destination (Approved o Rejected node)
+      // 1. Reference sa kasalukuyang record sa "concerns"
+      const oldRef = ref(db, `concerns/${item.id}`);
+      // 2. Reference sa destinasyon (Approved o Rejected node)
       const newRef = ref(db, `${status}/${item.id}`);
 
       // Kunin ang data mula sa Firebase
@@ -20,20 +22,21 @@ export default function Extraction({ item, onClose }: { item: any, onClose: () =
       if (snapshot.exists()) {
         const data = snapshot.val();
         
-        // I-save sa bagong location na may kasamang status, timestamp, at optional rejection reason
+        // Payload na isasave sa database
         const updatedData = {
-          ...data, 
-          status: status, 
+          ...data,
+          status: status,
           processedAt: new Date().toISOString(),
-          ...(status === 'Rejected' && { rejectionReason: reason })
+          ...(status === 'Rejected' && { rejectionReason: reason }) // Isasama ang reason kung Rejected
         };
 
+        // Isulat sa bagong path
         await set(newRef, updatedData);
         
-        // Burahin ang data sa lumang location (Tooth concern)
+        // Burahin sa lumang path ("concerns")
         await remove(oldRef);
         
-        Alert.alert("Success", `Extraction concern has been ${status}.`);
+        Alert.alert("Success", `Concern has been moved to ${status}.`);
         setRejectModalVisible(false);
         onClose();
       } else {
@@ -41,29 +44,15 @@ export default function Extraction({ item, onClose }: { item: any, onClose: () =
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to update status.");
+      Alert.alert("Error", "Failed to move data.");
     }
-  };
-
-  const renderTeethInfo = () => {
-    const teethData = item.selectedTeeth;
-    if (!teethData) return <Text style={styles.value}>No specific teeth selected.</Text>;
-    
-    return Object.entries(teethData).map(([key, value]) => (
-      <View key={key} style={styles.teethItem}>
-        <Ionicons name="medical" size={16} color="#E91E63" style={{ marginRight: 8 }} />
-        <Text style={styles.value}>
-          {key.replace(/([A-Z])/g, ' $1')}: <Text style={{ fontWeight: 'normal' }}>{String(value)}</Text>
-        </Text>
-      </View>
-    ));
   };
 
   return (
     <View style={styles.overlay}>
       <View style={styles.modalContent}>
         <View style={styles.headerBar}>
-          <Text style={styles.title}>Extraction Details</Text>
+          <Text style={styles.title}>Concern Details</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color="#666" />
           </TouchableOpacity>
@@ -71,27 +60,27 @@ export default function Extraction({ item, onClose }: { item: any, onClose: () =
 
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.infoCard}>
-            <Text style={styles.label}>Patient Email</Text>
-            <Text style={styles.value}>{item?.user}</Text>
+            <Text style={styles.label}>Patient Name</Text>
+            <Text style={styles.value}>{item?.patientName}</Text>
             
             <Text style={[styles.label, { marginTop: 15 }]}>Date Submitted</Text>
             <Text style={styles.value}>
-              {item?.timestamp ? new Date(item.timestamp).toLocaleDateString('en-PH', { dateStyle: 'long' }) : 'N/A'}
+              {item?.date ? new Date(item.date).toLocaleDateString('en-PH', { dateStyle: 'long' }) : 'N/A'}
             </Text>
           </View>
 
-          <Text style={styles.sectionHeader}>Teeth for Extraction</Text>
+          <Text style={styles.sectionHeader}>Concern Message</Text>
           <View style={styles.messageBox}>
-            {renderTeethInfo()}
+            <Text style={styles.messageText}>{item?.concern || "No message provided."}</Text>
           </View>
 
-          {item.imageUris && Array.isArray(item.imageUris) && item.imageUris.length > 0 && (
+          {item?.images && item.images.length > 0 && (
             <>
               <Text style={styles.sectionHeader}>Actual Pictures of Teeth</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
-                {item.imageUris.map((uri: string, index: number) => (
+                {item.images.map((uri: string, index: number) => (
                   <View key={index} style={styles.imageWrapper}>
-                    <Image source={{ uri: uri }} style={styles.patientImage} resizeMode="cover" />
+                    <Image source={{ uri }} style={styles.image} />
                   </View>
                 ))}
               </ScrollView>
@@ -172,10 +161,10 @@ const styles = StyleSheet.create({
   value: { fontSize: 15, fontWeight: '700', color: '#333', marginTop: 2 },
   sectionHeader: { fontSize: 14, fontWeight: '700', color: '#E91E63', marginBottom: 10 },
   messageBox: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EEE', padding: 15, borderRadius: 15, marginBottom: 20 },
-  teethItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  messageText: { color: '#444', lineHeight: 22 },
   imageScroll: { marginBottom: 20 },
   imageWrapper: { marginRight: 15 },
-  patientImage: { width: 120, height: 120, borderRadius: 15, borderWidth: 2, borderColor: '#E91E63' },
+  image: { width: 120, height: 120, borderRadius: 15, borderWidth: 2, borderColor: '#E91E63' },
   actionButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
   btn: { flexDirection: 'row', padding: 16, borderRadius: 15, width: '47%', alignItems: 'center', justifyContent: 'center' },
   rejectBtn: { backgroundColor: '#E91E63' },

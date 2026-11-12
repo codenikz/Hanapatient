@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ref, get, set, remove } from 'firebase/database';
-import { db } from '../../../../Firebase/FirebaseConfig';
+import { db } from '../../Firebase/FirebaseConfig';
 
 export default function Sealant({ item, onClose }: { item: any, onClose: () => void }) {
+  if (!item) return null;
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
@@ -78,7 +79,7 @@ export default function Sealant({ item, onClose }: { item: any, onClose: () => v
   };
 
   const renderTeethInfo = () => {
-    if (!item.selectedTeeth) return <Text style={styles.value}>Not specified</Text>;
+    if (!item?.selectedTeeth) return <Text style={styles.value}>Not specified</Text>;
 
     const quadrants = [
       { key: 'upperRight', label: 'Upper Right' },
@@ -122,7 +123,7 @@ export default function Sealant({ item, onClose }: { item: any, onClose: () => v
             {renderTeethInfo()}
           </View>
 
-          {item.imageUris && item.imageUris.length > 0 && (
+          {item?.imageUris && item.imageUris.length > 0 && (
             <>
               <Text style={styles.sectionHeader}>Teeth Pictures</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>

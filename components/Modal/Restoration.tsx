@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ref, get, set, remove } from 'firebase/database';
-import { db } from '../../../../Firebase/FirebaseConfig';
+import { db } from '../../Firebase/FirebaseConfig';
 
-export default function PartialDenture({ item, onClose }: { item: any, onClose: () => void }) {
+export default function Restoration({ item, onClose }: { item: any, onClose: () => void }) {
+  if (!item) return null;
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
-  // Function para ilipat ang data sa kaukulang folder kasama ang rejection reason kung kinakailangan
+  // Function para ilipat ang data sa kaukulang folder sa Firebase kasama ang optional rejection reason
   const moveDataToStatus = async (status: 'Approved' | 'Rejected', reason: string = '') => {
     try {
       // 1. Reference sa kasalukuyang record sa "Tooth concern"
@@ -18,13 +19,14 @@ export default function PartialDenture({ item, onClose }: { item: any, onClose: 
 
       // Kunin ang data mula sa Firebase
       const snapshot = await get(oldRef);
+      
       if (snapshot.exists()) {
         const data = snapshot.val();
         
-        // Isulat sa bagong path na may status, processedAt timestamp, at optional rejectionReason
+        // I-save sa bagong location na may kasamang status, timestamp, at rejection reason kung Rejected
         const updatedData = {
-          ...data, 
-          status: status, 
+          ...data,
+          status: status,
           processedAt: new Date().toISOString(),
           ...(status === 'Rejected' && { rejectionReason: reason })
         };
@@ -34,15 +36,15 @@ export default function PartialDenture({ item, onClose }: { item: any, onClose: 
         // Burahin ang data sa lumang location (Tooth concern)
         await remove(oldRef);
         
-        Alert.alert("Success", `Denture concern has been moved to ${status}.`);
+        Alert.alert("Success", `Sealant concern has been ${status}.`);
         setRejectModalVisible(false);
         onClose();
       } else {
-        Alert.alert("Error", "Record not found.");
+        Alert.alert("Error", "Record not found in database.");
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to move data.");
+      Alert.alert("Error", "Failed to process request.");
     }
   };
 
@@ -77,35 +79,19 @@ export default function PartialDenture({ item, onClose }: { item: any, onClose: 
   };
 
   const renderTeethInfo = () => {
-    if (item.selectedTeeth) {
-      const quadrants = [
-        { key: 'upperRight', label: 'Upper Right' },
-        { key: 'upperLeft', label: 'Upper Left' },
-        { key: 'lowerRight', label: 'Lower Right' },
-        { key: 'lowerLeft', label: 'Lower Left' },
-      ];
+    if (!item?.selectedTeeth) return <Text style={styles.value}>Not specified</Text>;
 
-      const content = quadrants.map(q => renderQuadrantTeeth(q.key, q.label)).filter(Boolean);
+    const quadrants = [
+      { key: 'upperRight', label: 'Upper Right' },
+      { key: 'upperLeft', label: 'Upper Left' },
+      { key: 'lowerRight', label: 'Lower Right' },
+      { key: 'lowerLeft', label: 'Lower Left' },
+    ];
 
-      if (content.length > 0) {
-        return content;
-      }
-    }
+    const content = quadrants.map(q => renderQuadrantTeeth(q.key, q.label)).filter(Boolean);
 
-    if (item.upperRight) {
-      return (
-        <View style={styles.quadrantBox}>
-          <View style={styles.quadrantHeaderRow}>
-            <Ionicons name="medical" size={16} color="#E91E63" style={{ marginRight: 6 }} />
-            <Text style={styles.quadrantTitle}>Area</Text>
-          </View>
-          <View style={styles.teethListContainer}>
-            <View style={styles.toothChip}>
-              <Text style={styles.toothChipText}>{item.upperRight}</Text>
-            </View>
-          </View>
-        </View>
-      );
+    if (content.length > 0) {
+      return content;
     }
 
     return <Text style={styles.value}>No specific teeth selected.</Text>;
@@ -115,7 +101,7 @@ export default function PartialDenture({ item, onClose }: { item: any, onClose: 
     <View style={styles.overlay}>
       <View style={styles.modalContent}>
         <View style={styles.headerBar}>
-          <Text style={styles.title}>Partial Denture Details</Text>
+          <Text style={styles.title}>Sealant Details</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color="#666" />
           </TouchableOpacity>
@@ -132,14 +118,14 @@ export default function PartialDenture({ item, onClose }: { item: any, onClose: 
             </Text>
           </View>
 
-          <Text style={styles.sectionHeader}>Selected Teeth / Areas</Text>
+          <Text style={styles.sectionHeader}>Selected Teeth</Text>
           <View style={styles.messageBox}>
             {renderTeethInfo()}
           </View>
 
-          {item.imageUris && item.imageUris.length > 0 && (
+          {item?.imageUris && item.imageUris.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>Uploaded Pictures</Text>
+              <Text style={styles.sectionHeader}>Teeth Pictures</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
                 {item.imageUris.map((uri: string, index: number) => (
                   <View key={index} style={styles.imageWrapper}>

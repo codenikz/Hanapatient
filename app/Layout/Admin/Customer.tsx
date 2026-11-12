@@ -16,16 +16,16 @@ import {
 import { db } from "../../../Firebase/FirebaseConfig";
 
 // Modals
-import Bleaching from "./Modal/Bleaching";
-import CompleteDenture from "./Modal/CompleteDenture";
-import Extraction from "./Modal/Extraction";
-import Fixed from "./Modal/Fixed";
-import Fluoride from "./Modal/Fluoride";
-import GenConern from "./Modal/GenConern";
-import OralProphylaxis from "./Modal/OralProphylaxis";
-import PartialDenture from "./Modal/PartialDenture";
-import Restoration from "./Modal/Restoration";
-import Sealant from "./Modal/Sealant";
+import Bleaching from "../../../components/Modal/Bleaching";
+import CompleteDenture from "../../../components/Modal/CompleteDenture";
+import Extraction from "../../../components/Modal/Extraction";
+import Fixed from "../../../components/Modal/Fixed";
+import Fluoride from "../../../components/Modal/Fluoride";
+import GenConern from "../../../components/Modal/GenConern";
+import OralProphylaxis from "../../../components/Modal/OralProphylaxis";
+import PartialDenture from "../../../components/Modal/PartialDenture";
+import Restoration from "../../../components/Modal/Restoration";
+import Sealant from "../../../components/Modal/Sealant";
 
 const { width } = Dimensions.get("window");
 

@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ref, get, set, remove } from 'firebase/database';
-import { db } from '../../../../Firebase/FirebaseConfig';
+import { db } from '../../Firebase/FirebaseConfig';
 
-export default function Fluoride({ item, onClose }: { item: any, onClose: () => void }) {
+export default function Fixed({ item, onClose }: { item: any, onClose: () => void }) {
+  if (!item) return null;
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
-  // Function para ilipat ang data sa kaukulang folder
   const moveDataToStatus = async (status: 'Approved' | 'Rejected', reason: string = '') => {
     try {
-      // 1. Reference sa kasalukuyang record sa "Tooth concern"
+      // 1. Reference sa kasalukuyang record
       const oldRef = ref(db, `Tooth concern/${item.id}`);
       // 2. Reference sa destinasyon (Approved o Rejected node)
       const newRef = ref(db, `${status}/${item.id}`);
@@ -21,7 +21,7 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
       if (snapshot.exists()) {
         const data = snapshot.val();
         
-        // Payload na isasave sa database kasama ang rejection reason kung rejected
+        // I-save sa bagong location na may status, timestamp, at optional rejection reason
         const updatedData = {
           ...data, 
           status: status, 
@@ -31,10 +31,10 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
 
         await set(newRef, updatedData);
         
-        // Burahin ang data sa lumang location (Tooth concern) para maalis sa pending list
+        // Burahin ang data sa lumang location (Tooth concern)
         await remove(oldRef);
         
-        Alert.alert("Success", `Fluoride concern has been moved to ${status}.`);
+        Alert.alert("Success", `Fixed Denture concern has been moved to ${status}.`);
         setRejectModalVisible(false);
         onClose();
       } else {
@@ -47,7 +47,8 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
   };
 
   const renderQuadrantTeeth = (quadrantKey: string, quadrantLabel: string) => {
-    const rawValue = item.selectedTeeth?.[quadrantKey];
+    const teethData = item?.selectedTeeth || item || {};
+    const rawValue = teethData?.[quadrantKey];
     
     // Suportahan kung array (multi-select) o kung string man o iba pang format
     let teethList: string[] = [];
@@ -77,16 +78,14 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
   };
 
   const renderTeethInfo = () => {
-    if (!item.selectedTeeth) return <Text style={styles.value}>Not specified</Text>;
-
-    const quadrants = [
+    const areas = [
       { key: 'upperRight', label: 'Upper Right' },
       { key: 'upperLeft', label: 'Upper Left' },
       { key: 'lowerRight', label: 'Lower Right' },
       { key: 'lowerLeft', label: 'Lower Left' },
     ];
-
-    const content = quadrants.map(q => renderQuadrantTeeth(q.key, q.label)).filter(Boolean);
+    
+    const content = areas.map(area => renderQuadrantTeeth(area.key, area.label)).filter(Boolean);
 
     if (content.length > 0) {
       return content;
@@ -99,7 +98,7 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
     <View style={styles.overlay}>
       <View style={styles.modalContent}>
         <View style={styles.headerBar}>
-          <Text style={styles.title}>Fluoride Details</Text>
+          <Text style={styles.title}>Fixed Denture Details</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color="#666" />
           </TouchableOpacity>
@@ -109,6 +108,7 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
           <View style={styles.infoCard}>
             <Text style={styles.label}>Patient Name</Text>
             <Text style={styles.value}>{item?.patientName || 'Unknown'}</Text>
+            
             <Text style={[styles.label, { marginTop: 15 }]}>Date Submitted</Text>
             <Text style={styles.value}>
               {item?.timestamp ? new Date(item.timestamp).toLocaleDateString('en-PH', { dateStyle: 'long' }) : 'N/A'}
@@ -120,9 +120,9 @@ export default function Fluoride({ item, onClose }: { item: any, onClose: () => 
             {renderTeethInfo()}
           </View>
 
-          {item.imageUris && item.imageUris.length > 0 && (
+          {item?.imageUris && item.imageUris.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>Pictures</Text>
+              <Text style={styles.sectionHeader}>Uploaded Pictures</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
                 {item.imageUris.map((uri: string, index: number) => (
                   <View key={index} style={styles.imageWrapper}>
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   closeBtn: { backgroundColor: '#F0F0F0', padding: 8, borderRadius: 20 },
   infoCard: { backgroundColor: '#F8F4FF', padding: 15, borderRadius: 15, marginBottom: 20 },
   label: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
-  value: { fontSize: 15, fontWeight: '700', color: '#333' },
+  value: { fontSize: 15, fontWeight: '700', color: '#333', marginTop: 2 },
   sectionHeader: { fontSize: 14, fontWeight: '700', color: '#E91E63', marginBottom: 10 },
   messageBox: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EEE', padding: 15, borderRadius: 15, marginBottom: 20, gap: 12 },
   quadrantBox: { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EFEFEF', padding: 12, borderRadius: 12 },
