@@ -27,7 +27,8 @@
       "package": "com.nickoessss.app"
     },
     "web": {
-      "output": "static",
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/Images/Logo.png"
     },
     "plugins": [
