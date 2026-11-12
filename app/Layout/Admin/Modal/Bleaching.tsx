@@ -1,38 +1,63 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, TextInput, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { ref, get, set, remove } from 'firebase/database';
-import { db } from '../../../../Firebase/FirebaseConfig';
+import { Ionicons } from "@expo/vector-icons";
+import { get, ref, remove, set } from "firebase/database";
+import { useState } from "react";
+import {
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { db } from "../../../../Firebase/FirebaseConfig";
 
-export default function Bleaching({ item, onClose }: { item: any, onClose: () => void }) {
+type BleachingProps = {
+  item?: any;
+  onClose?: () => void;
+};
+
+export default function Bleaching({
+  item,
+  onClose = () => {},
+}: BleachingProps) {
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  // Safe defaults para hindi mag-crash kapag walang item
+  const selectedTeeth = item?.selectedTeeth;
+  const imageUris: string[] = item?.imageUris ?? [];
 
   // Function para ilipat ang data kasama ang optional rejection reason
-  const moveDataToStatus = async (status: 'Approved' | 'Rejected', reason: string = '') => {
+  const moveDataToStatus = async (
+    status: "Approved" | "Rejected",
+    reason: string = "",
+  ) => {
+    if (!item?.id) {
+      Alert.alert("Error", "No record selected.");
+      return;
+    }
+
     try {
-      // 1. Reference sa kasalukuyang record sa "Tooth concern"
       const oldRef = ref(db, `Tooth concern/${item.id}`);
-      // 2. Reference sa destinasyon (Approved o Rejected node)
       const newRef = ref(db, `${status}/${item.id}`);
 
-      // Kunin ang data mula sa Firebase
       const snapshot = await get(oldRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
-        
-        // Payload na isasave sa database
+
         const updatedData = {
           ...data,
           status: status,
           processedAt: new Date().toISOString(),
-          ...(status === 'Rejected' && { rejectionReason: reason }) // Isasama ang reason kung Rejected
+          ...(status === "Rejected" && { rejectionReason: reason }),
         };
-        
+
         await set(newRef, updatedData);
-        // Burahin ang data sa lumang location (Tooth concern) para hindi na ito makita sa pending
         await remove(oldRef);
-        
+
         Alert.alert("Success", `Request has been moved to ${status}.`);
         setRejectModalVisible(false);
         onClose();
@@ -58,29 +83,45 @@ export default function Bleaching({ item, onClose }: { item: any, onClose: () =>
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.infoCard}>
             <Text style={styles.label}>Patient Name</Text>
-            <Text style={styles.value}>{item?.patientName || 'Unknown'}</Text>
-            
-            <Text style={[styles.label, { marginTop: 15 }]}>Date Requested</Text>
+            <Text style={styles.value}>{item?.patientName || "Unknown"}</Text>
+
+            <Text style={[styles.label, { marginTop: 15 }]}>
+              Date Requested
+            </Text>
             <Text style={styles.value}>
-              {item?.timestamp ? new Date(item.timestamp).toLocaleDateString('en-PH', { dateStyle: 'long' }) : 'N/A'}
+              {item?.timestamp
+                ? new Date(item.timestamp).toLocaleDateString("en-PH", {
+                    dateStyle: "long",
+                  })
+                : "N/A"}
             </Text>
           </View>
 
-          {item.selectedTeeth && (
+          {selectedTeeth && (
             <>
               <Text style={styles.sectionHeader}>Selected Teeth</Text>
               <View style={styles.teethBox}>
-                <Text style={styles.teethText}>Upper: {item.selectedTeeth.upperLeft} / {item.selectedTeeth.upperRight}</Text>
-                <Text style={styles.teethText}>Lower: {item.selectedTeeth.lowerLeft} / {item.selectedTeeth.lowerRight}</Text>
+                <Text style={styles.teethText}>
+                  Upper: {selectedTeeth?.upperLeft} /{" "}
+                  {selectedTeeth?.upperRight}
+                </Text>
+                <Text style={styles.teethText}>
+                  Lower: {selectedTeeth?.lowerLeft} /{" "}
+                  {selectedTeeth?.lowerRight}
+                </Text>
               </View>
             </>
           )}
 
-          {item.imageUris && item.imageUris.length > 0 && (
+          {imageUris.length > 0 && (
             <>
               <Text style={styles.sectionHeader}>Actual Pictures of Teeth</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
-                {item.imageUris.map((uri: string, index: number) => (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.imageScroll}
+              >
+                {imageUris.map((uri: string, index: number) => (
                   <View key={index} style={styles.imageWrapper}>
                     <Image source={{ uri }} style={styles.image} />
                   </View>
@@ -92,11 +133,17 @@ export default function Bleaching({ item, onClose }: { item: any, onClose: () =>
 
         {/* Buttons para sa paglilipat ng data */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={[styles.btn, styles.rejectBtn]} onPress={() => setRejectModalVisible(true)}>
+          <TouchableOpacity
+            style={[styles.btn, styles.rejectBtn]}
+            onPress={() => setRejectModalVisible(true)}
+          >
             <Ionicons name="close-circle" size={20} color="#FFF" />
             <Text style={styles.btnText}> Reject</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.approveBtn]} onPress={() => moveDataToStatus('Approved')}>
+          <TouchableOpacity
+            style={[styles.btn, styles.approveBtn]}
+            onPress={() => moveDataToStatus("Approved")}
+          >
             <Ionicons name="checkmark-circle" size={20} color="#FFF" />
             <Text style={styles.btnText}> Approve</Text>
           </TouchableOpacity>
@@ -112,8 +159,10 @@ export default function Bleaching({ item, onClose }: { item: any, onClose: () =>
           <View style={styles.modalOverlay}>
             <View style={styles.reasonCard}>
               <Text style={styles.reasonTitle}>Reason for Rejection</Text>
-              <Text style={styles.reasonSubtitle}>Please provide a reason why this concern is being rejected.</Text>
-              
+              <Text style={styles.reasonSubtitle}>
+                Please provide a reason why this concern is being rejected.
+              </Text>
+
               <TextInput
                 style={styles.textInput}
                 placeholder="Type reason here..."
@@ -124,21 +173,24 @@ export default function Bleaching({ item, onClose }: { item: any, onClose: () =>
               />
 
               <View style={styles.reasonActionButtons}>
-                <TouchableOpacity 
-                  style={[styles.reasonBtn, styles.cancelBtn]} 
+                <TouchableOpacity
+                  style={[styles.reasonBtn, styles.cancelBtn]}
                   onPress={() => setRejectModalVisible(false)}
                 >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.reasonBtn, styles.confirmRejectBtn]} 
+                <TouchableOpacity
+                  style={[styles.reasonBtn, styles.confirmRejectBtn]}
                   onPress={() => {
                     if (!rejectionReason.trim()) {
-                      Alert.alert("Required", "Please enter a rejection reason.");
+                      Alert.alert(
+                        "Required",
+                        "Please enter a rejection reason.",
+                      );
                       return;
                     }
-                    moveDataToStatus('Rejected', rejectionReason);
+                    moveDataToStatus("Rejected", rejectionReason);
                   }}
                 >
                   <Text style={styles.confirmBtnText}>Submit Reject</Text>
@@ -147,43 +199,127 @@ export default function Bleaching({ item, onClose }: { item: any, onClose: () =>
             </View>
           </View>
         </Modal>
-
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#FFF', padding: 25, borderRadius: 30, elevation: 10, maxHeight: '85%' },
-  headerBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 20, fontWeight: '800', color: '#E91E63' },
-  closeBtn: { backgroundColor: '#F0F0F0', padding: 8, borderRadius: 20 },
-  infoCard: { backgroundColor: '#F8F4FF', padding: 15, borderRadius: 15, marginBottom: 20 },
-  label: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
-  value: { fontSize: 15, fontWeight: '700', color: '#333', marginTop: 2 },
-  sectionHeader: { fontSize: 14, fontWeight: '700', color: '#E91E63', marginBottom: 10 },
-  teethBox: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EEE', padding: 15, borderRadius: 15, marginBottom: 20 },
-  teethText: { fontSize: 14, color: '#444', marginBottom: 4 },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#FFF",
+    padding: 25,
+    borderRadius: 30,
+    elevation: 10,
+    maxHeight: "85%",
+  },
+  headerBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  title: { fontSize: 20, fontWeight: "800", color: "#E91E63" },
+  closeBtn: { backgroundColor: "#F0F0F0", padding: 8, borderRadius: 20 },
+  infoCard: {
+    backgroundColor: "#F8F4FF",
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 12,
+    color: "#888",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  value: { fontSize: 15, fontWeight: "700", color: "#333", marginTop: 2 },
+  sectionHeader: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#E91E63",
+    marginBottom: 10,
+  },
+  teethBox: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#EEE",
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  teethText: { fontSize: 14, color: "#444", marginBottom: 4 },
   imageScroll: { marginBottom: 20 },
   imageWrapper: { marginRight: 15 },
-  image: { width: 120, height: 120, borderRadius: 15, borderWidth: 2, borderColor: '#E91E63' },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
-  btn: { flexDirection: 'row', padding: 16, borderRadius: 15, width: '47%', alignItems: 'center', justifyContent: 'center' },
-  rejectBtn: { backgroundColor: '#E91E63' },
-  approveBtn: { backgroundColor: '#4CAF50' },
-  btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 15 },
+  image: {
+    width: 120,
+    height: 120,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: "#E91E63",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 5,
+  },
+  btn: {
+    flexDirection: "row",
+    padding: 16,
+    borderRadius: 15,
+    width: "47%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectBtn: { backgroundColor: "#E91E63" },
+  approveBtn: { backgroundColor: "#4CAF50" },
+  btnText: { color: "#FFF", fontWeight: "bold", fontSize: 15 },
 
   // Rejection Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  reasonCard: { backgroundColor: '#FFF', width: '100%', padding: 20, borderRadius: 20, elevation: 5 },
-  reasonTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 5 },
-  reasonSubtitle: { fontSize: 13, color: '#666', marginBottom: 15 },
-  textInput: { borderWidth: 1, borderColor: '#DDD', borderRadius: 12, padding: 12, height: 100, textAlignVertical: 'top', fontSize: 14, backgroundColor: '#FAFAFA', marginBottom: 20 },
-  reasonActionButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  reasonBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
-  cancelBtn: { backgroundColor: '#F0F0F0', marginRight: 10 },
-  cancelBtnText: { color: '#333', fontWeight: '600' },
-  confirmRejectBtn: { backgroundColor: '#E91E63', marginLeft: 10 },
-  confirmBtnText: { color: '#FFF', fontWeight: 'bold' }
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  reasonCard: {
+    backgroundColor: "#FFF",
+    width: "100%",
+    padding: 20,
+    borderRadius: 20,
+    elevation: 5,
+  },
+  reasonTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 5,
+  },
+  reasonSubtitle: { fontSize: 13, color: "#666", marginBottom: 15 },
+  textInput: {
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 12,
+    padding: 12,
+    height: 100,
+    textAlignVertical: "top",
+    fontSize: 14,
+    backgroundColor: "#FAFAFA",
+    marginBottom: 20,
+  },
+  reasonActionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  reasonBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: "center" },
+  cancelBtn: { backgroundColor: "#F0F0F0", marginRight: 10 },
+  cancelBtnText: { color: "#333", fontWeight: "600" },
+  confirmRejectBtn: { backgroundColor: "#E91E63", marginLeft: 10 },
+  confirmBtnText: { color: "#FFF", fontWeight: "bold" },
 });
